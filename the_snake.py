@@ -3,7 +3,6 @@ from typing import TypeAlias
 
 import pygame as pg
 
-
 # Алиасы типов:
 Direction: TypeAlias = tuple[int, int]
 Color: TypeAlias = tuple[int, int, int]
