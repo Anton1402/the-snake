@@ -1,4 +1,4 @@
-from random import choice, randint
+from random import randint
 from typing import TypeAlias
 
 import pygame as pg
@@ -34,6 +34,9 @@ SNAKE_COLOR: Color = (0, 255, 0)
 
 # Цвет камня - серый:
 STONE_COLOR: Color = (128, 128, 128)
+
+# Цвет "неправильной еды" - Манджета (розовый)
+BAD_FOOD_COLOR: Color = (255, 0, 255)
 
 # Скорость движения змейки:
 SPEED: int = 20
@@ -140,6 +143,66 @@ class Apple(GameObject):
         pg.draw.rect(screen, BORDER_COLOR, rect, 1)
 
 
+class BadFood(Apple):
+    """
+    Игровой объект неправильной еды.
+
+    При столкновении со змеёй уменьшает её длину.
+    Наследует от Apple логику случайного размещения
+    и отрисовки.
+    """
+
+    def __init__(
+            self,
+            body_color: Color = BAD_FOOD_COLOR,
+            occupied_positions: list[tuple[int, int]] | None = None,
+    ):
+        super().__init__(body_color=body_color)
+        if occupied_positions is None:
+            occupied_positions = []
+        self.randomize_position(occupied_positions)
+
+
+class Stone(GameObject):
+
+    def __init__(
+            self,
+            body_color: Color = STONE_COLOR,
+            occupied_positions: list[tuple[int, int]] | None = None,
+    ):
+        super().__init__(body_color=body_color)
+        if occupied_positions is None:
+            occupied_positions = []
+        self.randomize_position(occupied_positions)
+
+    def randomize_position(
+            self,
+            occupied_positions: list[tuple[int, int]],
+    ):
+        """
+        Устанавливает случайное положение камня на игровом поле.
+
+        Args:
+            occupied_positions (list[tuple[int, int]]):
+                Координаты занятых клеток поля.
+        """
+        while True:
+            rand_x = randint(0, GRID_WIDTH - 1) * GRID_SIZE
+            rand_y = randint(0, GRID_HEIGHT - 1) * GRID_SIZE
+            new_position = (rand_x, rand_y)
+            # Проверка новых координат камня на совпадение
+            # с координатами змеи.
+            if new_position not in occupied_positions:
+                self.position = new_position
+                break
+
+    def draw(self):
+        """Отрисовка яблока на поле."""
+        rect = pg.Rect(self.position, (GRID_SIZE, GRID_SIZE))
+        pg.draw.rect(screen, self.body_color, rect)
+        pg.draw.rect(screen, BORDER_COLOR, rect, 1)
+
+
 class Snake(GameObject):
     """
     Игровой объект Змея. Наследуется от класса GameObject.
@@ -213,6 +276,16 @@ class Snake(GameObject):
         if len(self.positions) > self.length:
             self.positions.pop()
 
+    def shrink(self):
+        """
+        Уменьшает длину змеи на один сегмент.
+
+        Длина змеи не может быть меньше одного сегмента.
+        """
+        if self.length > 1:
+            self.length -= 1
+            self.positions.pop()
+
     def get_new_head_position(self):
         """
         Рассчитывает координаты головы змеи после следующего шага.
@@ -275,22 +348,26 @@ def handle_keys(game_object):
             raise SystemExit
         elif event.type == pg.KEYDOWN:
             if not game_object.is_moving:
-                if event.key == pg.K_UP:
+                if event.key == pg.K_UP or event.key == pg.K_w:
                     game_object.next_direction = UP
-                elif event.key == pg.K_DOWN:
+                elif event.key == pg.K_DOWN or event.key == pg.K_s:
                     game_object.next_direction = DOWN
-                elif event.key == pg.K_LEFT:
+                elif event.key == pg.K_LEFT or event.key == pg.K_a:
                     game_object.next_direction = LEFT
-                elif event.key == pg.K_RIGHT:
+                elif event.key == pg.K_RIGHT or event.key == pg.K_d:
                     game_object.next_direction = RIGHT
             else:
-                if event.key == pg.K_UP and game_object.direction != DOWN:
+                if (event.key == pg.K_UP or event.key == pg.K_w) and \
+                        game_object.direction != DOWN:
                     game_object.next_direction = UP
-                elif event.key == pg.K_DOWN and game_object.direction != UP:
+                elif (event.key == pg.K_DOWN or event.key == pg.K_s) and \
+                        game_object.direction != UP:
                     game_object.next_direction = DOWN
-                elif event.key == pg.K_LEFT and game_object.direction != RIGHT:
+                elif (event.key == pg.K_LEFT or event.key == pg.K_a) and \
+                        game_object.direction != RIGHT:
                     game_object.next_direction = LEFT
-                elif event.key == pg.K_RIGHT and game_object.direction != LEFT:
+                elif (event.key == pg.K_RIGHT or event.key == pg.K_d) and \
+                        game_object.direction != LEFT:
                     game_object.next_direction = RIGHT
 
 
@@ -302,6 +379,25 @@ def reset_screen():
     чтобы удалить предыдущие изображения игровых объектов.
     """
     screen.fill(BOARD_BACKGROUND_COLOR)
+
+
+def get_occupied_positions(snake, *objects):
+    """
+    Возвращает координаты всех занятых клеток.
+
+    Args:
+        snake (Snake): Объект змеи.
+        *objects (GameObject): Остальные игровые объекты.
+
+    Returns:
+        list[tuple[int, int]]: Координаты занятых клеток.
+    """
+    occupied_positions = snake.positions.copy()
+
+    for obj in objects:
+        occupied_positions.append(obj.position)
+
+    return occupied_positions
 
 
 def main():
@@ -319,7 +415,14 @@ def main():
     # Тут нужно создать экземпляры классов.
     # Создаем сначала змею, так как в яблоко будут переданы координаты змейки.
     snake = Snake()
-    apple = Apple(occupied_positions=snake.positions)
+    occupied_positions = get_occupied_positions(snake)
+    stone = Stone(occupied_positions=occupied_positions)
+
+    occupied_positions = get_occupied_positions(snake, stone)
+    apple = Apple(occupied_positions=occupied_positions)
+
+    occupied_positions = get_occupied_positions(snake, stone, apple)
+    bad_food = BadFood(occupied_positions=occupied_positions)
 
     while True:
         clock.tick(SPEED)
@@ -332,22 +435,48 @@ def main():
         if snake.is_moving:
             # Проверяем съела ли яблоко и увеличиваем длину.
             ate_apple = snake.get_new_head_position() == apple.position
+            ate_bad_food = snake.get_new_head_position() == bad_food.position
+            # Проверяем съедено ли яблоко.
             if ate_apple:
                 snake.length += 1
             # Перемещение змейки.
             snake.move()
+            # Проверяем съедена ли "неправильная еда".
+            if ate_bad_food:
+                snake.shrink()
             # Новое яблоко теперь учитывает координаты новой головы змеи.
             if ate_apple:
-                apple.randomize_position(snake.positions)
+                occupied_positions = get_occupied_positions(snake, stone)
+                apple.randomize_position(occupied_positions)
+            # Генерируем новую "неправильную еду", если она была съедена.
+            if ate_bad_food:
+                occupied_positions = get_occupied_positions(
+                    snake,
+                    stone,
+                    bad_food,
+                )
+                bad_food.randomize_position(occupied_positions)
             # Проверяем столкновение змейки с собой.
-            if snake.get_head_position() in snake.positions[1:]:
+            if snake.get_head_position() in snake.positions[1:] or \
+                    snake.get_head_position() == stone.position:
                 snake.reset()
+                stone.randomize_position(snake.positions)
                 # После сброса создаём яблоко заново,
                 # чтобы оно не оказалось на змейке.
-                apple.randomize_position(snake.positions)
-        # Отрисовка яблока и змеи.
+                occupied_positions = get_occupied_positions(snake, stone)
+                apple.randomize_position(occupied_positions)
+                occupied_positions = get_occupied_positions(
+                    snake,
+                    stone,
+                    bad_food,
+                )
+                bad_food.randomize_position(occupied_positions)
+        # Отрисовка яблока, змеи и камня.
         apple.draw()
+        stone.draw()
+        bad_food.draw()
         snake.draw()
+
         # Обновлене экрана
         pg.display.update()
 
