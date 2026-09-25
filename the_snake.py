@@ -155,7 +155,6 @@ class Snake(GameObject):
         next_direction (tuple[int, int] | None):
             Следующее направление движения, которое будет применено
             после обработки нажатия клавиши.
-        last (tuple[int, int] | None): Координаты последнего сегмента змеи.
 
     Methods:
         __init__(self):
@@ -176,7 +175,7 @@ class Snake(GameObject):
     """
 
     def __init__(self, body_color: Color = SNAKE_COLOR):
-        """Инициализация объекта класса Apple."""
+        """Инициализация объекта класса Snake."""
         super().__init__(body_color=body_color)
         self.direction = RIGHT
         self.start_attributes()
@@ -186,7 +185,6 @@ class Snake(GameObject):
         self.length = 1
         self.positions = [self.position]
         self.next_direction = None
-        self.last = None
 
     def reset(self):
         """
@@ -212,14 +210,12 @@ class Snake(GameObject):
         последний сегмент, если длина змеи не увеличилась.
         """
         new_head_position = self.get_new_head_position()
-        # Сначала запоминаем последний элемент змейки.
-        self.last = self.positions[-1]
-        # Потом добавляем новые координаты головы.
+        # Добавляем новые координаты головы.
         self.positions.insert(0, new_head_position)
 
         # Удаляем последний сегмент, если не съели яблоко.
         if len(self.positions) > self.length:
-            self.positions.remove(self.last)
+            self.positions.pop()
 
     def get_new_head_position(self):
         """
@@ -325,17 +321,18 @@ def main():
         handle_keys(snake)
         # Обновление направления движения змейки.
         snake.update_direction()
-
-        # Проверяем съела ли яблоко.
-        if snake.get_new_head_position() == apple.position:
+        # Проверяем съела ли яблоко и увеличиваем длину.
+        ate_apple = snake.get_new_head_position() == apple.position
+        if ate_apple:
             snake.length += 1
-            apple.randomize_position(snake.positions)
         # Перемещение змейки.
         snake.move()
+        # Новое яблоко теперь учитывает координаты новой головы змеи.
+        if ate_apple:
+            apple.randomize_position(snake.positions)
         # Проверяем столкновение змейки с собой.
         if snake.get_head_position() in snake.positions[1:]:
             snake.reset()
-            reset_screen()
         # Отрисовка яблока и змеи.
         apple.draw()
         snake.draw()
