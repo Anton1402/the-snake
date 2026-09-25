@@ -177,22 +177,18 @@ class Snake(GameObject):
     def __init__(self, body_color: Color = SNAKE_COLOR):
         """Инициализация объекта класса Snake."""
         super().__init__(body_color=body_color)
-        self.direction = RIGHT
-        self.start_attributes()
-
-    def start_attributes(self):
-        """Устанавливает начальные атрибуты змеи."""
-        self.length = 1
-        self.positions = [self.position]
-        self.next_direction = None
+        self.reset()
 
     def reset(self):
         """
         Возвращает змею в начальное состояние и
         задает случайное направление движения.
         """
-        self.start_attributes()
-        self.direction = choice([LEFT, RIGHT, UP, DOWN])
+        self.length = 1
+        self.positions = [self.position]
+        self.next_direction = None
+        self.direction = RIGHT
+        self.is_moving = False
 
     def get_head_position(self):
         """
@@ -246,6 +242,7 @@ class Snake(GameObject):
         if self.next_direction:
             self.direction = self.next_direction
             self.next_direction = None
+            self.is_moving = True
 
     def draw(self):
         """
@@ -277,14 +274,24 @@ def handle_keys(game_object):
             pg.quit()
             raise SystemExit
         elif event.type == pg.KEYDOWN:
-            if event.key == pg.K_UP and game_object.direction != DOWN:
-                game_object.next_direction = UP
-            elif event.key == pg.K_DOWN and game_object.direction != UP:
-                game_object.next_direction = DOWN
-            elif event.key == pg.K_LEFT and game_object.direction != RIGHT:
-                game_object.next_direction = LEFT
-            elif event.key == pg.K_RIGHT and game_object.direction != LEFT:
-                game_object.next_direction = RIGHT
+            if not game_object.is_moving:
+                if event.key == pg.K_UP:
+                    game_object.next_direction = UP
+                elif event.key == pg.K_DOWN:
+                    game_object.next_direction = DOWN
+                elif event.key == pg.K_LEFT:
+                    game_object.next_direction = LEFT
+                elif event.key == pg.K_RIGHT:
+                    game_object.next_direction = RIGHT
+            else:
+                if event.key == pg.K_UP and game_object.direction != DOWN:
+                    game_object.next_direction = UP
+                elif event.key == pg.K_DOWN and game_object.direction != UP:
+                    game_object.next_direction = DOWN
+                elif event.key == pg.K_LEFT and game_object.direction != RIGHT:
+                    game_object.next_direction = LEFT
+                elif event.key == pg.K_RIGHT and game_object.direction != LEFT:
+                    game_object.next_direction = RIGHT
 
 
 def reset_screen():
@@ -321,18 +328,23 @@ def main():
         handle_keys(snake)
         # Обновление направления движения змейки.
         snake.update_direction()
-        # Проверяем съела ли яблоко и увеличиваем длину.
-        ate_apple = snake.get_new_head_position() == apple.position
-        if ate_apple:
-            snake.length += 1
-        # Перемещение змейки.
-        snake.move()
-        # Новое яблоко теперь учитывает координаты новой головы змеи.
-        if ate_apple:
-            apple.randomize_position(snake.positions)
-        # Проверяем столкновение змейки с собой.
-        if snake.get_head_position() in snake.positions[1:]:
-            snake.reset()
+        # Если змейя движется:
+        if snake.is_moving:
+            # Проверяем съела ли яблоко и увеличиваем длину.
+            ate_apple = snake.get_new_head_position() == apple.position
+            if ate_apple:
+                snake.length += 1
+            # Перемещение змейки.
+            snake.move()
+            # Новое яблоко теперь учитывает координаты новой головы змеи.
+            if ate_apple:
+                apple.randomize_position(snake.positions)
+            # Проверяем столкновение змейки с собой.
+            if snake.get_head_position() in snake.positions[1:]:
+                snake.reset()
+                # После сброса создаём яблоко заново,
+                # чтобы оно не оказалось на змейке.
+                apple.randomize_position(snake.positions)
         # Отрисовка яблока и змеи.
         apple.draw()
         snake.draw()
