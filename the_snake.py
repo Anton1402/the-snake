@@ -400,6 +400,7 @@ def handle_keys(game_object):
     Args:
         game_object: Объект, состояние которого обновляется.
     """
+    enter_pressed = False
     for event in pg.event.get():
         if event.type == pg.QUIT:
             pg.quit()
@@ -427,6 +428,9 @@ def handle_keys(game_object):
                 elif (event.key == pg.K_RIGHT or event.key == pg.K_d) and \
                         game_object.direction != LEFT:
                     game_object.next_direction = RIGHT
+            if event.key == pg.K_RETURN:
+                enter_pressed = True
+    return enter_pressed
 
 
 def reset_screen():
@@ -482,6 +486,16 @@ def get_occupied_positions(snake, *objects):
     return occupied_positions
 
 
+def reset_game(*objects):
+    for obj in objects:
+        if isinstance(obj, Snake):
+            obj.reset()
+        elif isinstance(obj, Apple):
+            obj.randomize_position(get_occupied_positions(*objects))
+        else:
+            obj.remove_all()
+
+
 def main():
     """
     Запускает основной игровой цикл.
@@ -504,71 +518,120 @@ def main():
         stones,
         apple,
     ))
+    # Вводим переменную остановки игры при столкновении.
+    game_over = False
+    # Создаем шрифт
+    font = pg.font.SysFont(None, 48)
+    font_2 = pg.font.SysFont(None, 24)
 
     while True:
         clock.tick(SPEED)
         reset_screen()
         # Обратбота событий клавиатуры.
-        handle_keys(snake)
+        enter_preseed = handle_keys(snake)
         # Обновление направления движения змейки.
         snake.update_direction()
-        # Если змейя движется:
-        if snake.is_moving:
-            # Проверяем съела ли яблоко и увеличиваем длину.
-            next_head_position = snake.get_new_head_position()
-            ate_apple = next_head_position == apple.position
-            ate_bad_food = next_head_position in bad_food.positions
-            # Проверяем съедено ли яблоко.
-            if ate_apple:
-                snake.length += 1
-            # Перемещение змейки.
-            snake.move()
-            # Проверяем съедена ли "неправильная еда".
-            if ate_bad_food:
-                snake.shrink()
-            # Сохраняем текущую max_lenght
-            current_max_length = snake.max_length
-            # Обновляем max_length у змеи
-            snake.change_max_length()
-            # Добавляем неправильную еду или камень, если необходимо,
-            # при условии, что длина змеи увеличилась.
-            if snake.max_length > current_max_length:
-                if snake.max_length % 5 == 0:
-                    bad_food.add_position(get_occupied_positions(
+        if game_over:
+            # Если нажат Enter, начинаем игру сначала.
+            if enter_preseed:
+                game_over = False
+                reset_game(snake, apple, stones, bad_food)
+            # Если Enter не был нажат, выводим на экран надпись и результат.
+            else:
+                # Создаем экран с текстом
+                game_over_surface = font.render(
+                    'GAME OVER',
+                    True,
+                    (255, 255, 255),
+                )
+                score_surface = font.render(
+                    f'Your score: {snake.max_length}',
+                    True,
+                    (255, 255, 255),
+                )
+                continue_surface = font_2.render(
+                    'Для продолжения нажмите Enter',
+                    True,
+                    (APPLE_COLOR)
+                )
+                # Узнаем размеры экрана с текстом
+                game_over_rect = game_over_surface.get_rect()
+                score_rect = score_surface.get_rect()
+                continue_rect = continue_surface.get_rect()
+                # Меняем центр экрана с текстом, чтобы надписи были в центре.
+                # game_over_rect.center = screen.get_rect().center
+                game_over_rect.center = (320, 200)
+                score_rect.center = (320, 260)
+                continue_rect.center = (320, 320)
+                # Помещаем экран с текстом на экран игры.
+                screen.blit(
+                    game_over_surface,
+                    game_over_rect,
+                )
+                screen.blit(
+                    score_surface,
+                    score_rect,
+                )
+                screen.blit(
+                    continue_surface,
+                    continue_rect,
+                )
+        if not game_over:
+            # Если змейя движется:
+            if snake.is_moving:
+                # Проверяем съела ли яблоко и увеличиваем длину.
+                next_head_position = snake.get_new_head_position()
+                ate_apple = next_head_position == apple.position
+                ate_bad_food = next_head_position in bad_food.positions
+                # Проверяем съедено ли яблоко.
+                if ate_apple:
+                    snake.length += 1
+                # Перемещение змейки.
+                snake.move()
+                # Проверяем съедена ли "неправильная еда".
+                if ate_bad_food:
+                    snake.shrink()
+                # Сохраняем текущую max_lenght
+                current_max_length = snake.max_length
+                # Обновляем max_length у змеи
+                snake.change_max_length()
+                # Добавляем неправильную еду или камень, если необходимо,
+                # при условии, что длина змеи увеличилась.
+                if snake.max_length > current_max_length:
+                    if snake.max_length % 5 == 0:
+                        bad_food.add_position(get_occupied_positions(
+                            snake,
+                            apple,
+                            stones,
+                            bad_food,
+                        ))
+                    if snake.max_length % 7 == 0:
+                        stones.add_position(get_occupied_positions(
+                            snake,
+                            apple,
+                            stones,
+                            bad_food,
+                        ))
+                # Новое яблоко теперь учитывает координаты новой головы змеи.
+                if ate_apple:
+                    apple.randomize_position(get_occupied_positions(
                         snake,
-                        apple,
                         stones,
                         bad_food,
                     ))
-                if snake.max_length % 7 == 0:
-                    stones.add_position(get_occupied_positions(
-                        snake,
-                        apple,
-                        stones,
-                        bad_food,
-                    ))
-            # Новое яблоко теперь учитывает координаты новой головы змеи.
-            if ate_apple:
-                apple.randomize_position(get_occupied_positions(
-                    snake,
-                    stones,
-                    bad_food,
-                ))
-            # Удаляем "неправильную еду", если она была съедена.
-            if ate_bad_food:
-                bad_food.remove_position(next_head_position)
-            # Проверяем столкновение змейки с собой.
-            if snake.get_head_position() in snake.positions[1:] or \
-                    snake.get_head_position() in stones.positions:
-                snake.reset()
-                apple.randomize_position(get_occupied_positions(snake))
-                stones.remove_all()
-                bad_food.remove_all()
-        # Отрисовка яблока, змеи, камней и неправильной еды.
-        apple.draw()
-        stones.draw()
-        bad_food.draw()
-        snake.draw()
+                # Удаляем "неправильную еду", если она была съедена.
+                if ate_bad_food:
+                    bad_food.remove_position(next_head_position)
+                # Проверяем столкновение змейки с собой.
+                if snake.get_head_position() in snake.positions[1:] or \
+                        snake.get_head_position() in stones.positions:
+                    game_over = True
+
+            # Отрисовка яблока, змеи, камней и неправильной еды.
+            apple.draw()
+            stones.draw()
+            bad_food.draw()
+            snake.draw()
 
         # Обновлене экрана
         pg.display.update()
