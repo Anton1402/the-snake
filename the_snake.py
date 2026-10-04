@@ -306,6 +306,7 @@ class Snake(GameObject):
         self.direction = RIGHT
         self.is_moving = False
         self.max_length = 1
+        self.last = []
 
     def get_head_position(self):
         """
@@ -325,20 +326,20 @@ class Snake(GameObject):
         new_head_position = self.get_new_head_position()
         # Добавляем новые координаты головы.
         self.positions.insert(0, new_head_position)
-
+        # Вопрос надо ли? 
+        self.last = []
         # Удаляем последний сегмент, если не съели яблоко.
         if len(self.positions) > self.length:
-            self.positions.pop()
+            self.last.append(self.positions.pop())
 
     def shrink(self):
         """
         Уменьшает длину змеи на один сегмент.
-
         Длина змеи не может быть меньше одного сегмента.
         """
         if self.length > 1:
             self.length -= 1
-            self.positions.pop()
+            self.last.append(self.positions.pop())
 
     def get_new_head_position(self):
         """
@@ -387,9 +388,43 @@ class Snake(GameObject):
         pg.draw.rect(screen, self.body_color, head_rect)
         pg.draw.rect(screen, BORDER_COLOR, head_rect, 1)
 
+
+    def draw_segment(self, position):
+        """
+        Отрисовывает один сегмент змеи на игровом поле.
+
+        Args:
+            position (tuple[int, int]): Координаты сегмента змеи.
+        """
+        rect = pg.Rect(position, (GRID_SIZE, GRID_SIZE))
+        pg.draw.rect(screen, self.body_color, rect)
+        pg.draw.rect(screen, BORDER_COLOR, rect, 1)
+
     def change_max_length(self):
         if self.length > self.max_length:
             self.max_length = self.length
+
+    def errase_segment(self, position):
+        """
+        Стирает один сегмент змеи с игрового поля.
+
+        Args:
+            position (tuple[int, int]): Координаты сегмента змеи.
+        """
+        rect = pg.Rect(position, (GRID_SIZE, GRID_SIZE))
+        pg.draw.rect(screen, BOARD_BACKGROUND_COLOR, rect)
+
+
+    def draw_move(self):
+        """
+        Отрисовывает движение змеи на игровом поле.
+        Стирает последний сегмент и отрисовывает новый сегмент головы.
+        """
+        # Стираем старый хвост
+        for position in self.last:
+            self.errase_segment(position)
+        # Рисуем новую голову
+        self.draw_segment(self.get_head_position())
 
 
 def handle_keys(game_object):
@@ -487,14 +522,20 @@ def get_occupied_positions(snake, *objects):
 
 
 def reset_game(*objects):
+    reset_screen()
     for obj in objects:
         if isinstance(obj, Snake):
             obj.reset()
+            obj.draw()
         elif isinstance(obj, Apple):
             obj.randomize_position(get_occupied_positions(*objects))
+            obj.draw()
         else:
             obj.remove_all()
+            obj.draw()
 
+
+    pg.display.update()
 
 def main():
     """
@@ -524,9 +565,17 @@ def main():
     font = pg.font.SysFont(None, 48)
     font_2 = pg.font.SysFont(None, 24)
 
+    # Отрисовываем все объекты на поле.
+    apple.draw()
+    stones.draw()
+    bad_food.draw()
+    snake.draw()
+    # Обновлене экрана
+    pg.display.update()
+
     while True:
         clock.tick(SPEED)
-        reset_screen()
+        # reset_screen()
         # Обратбота событий клавиатуры.
         enter_preseed = handle_keys(snake)
         # Обновление направления движения змейки.
@@ -535,6 +584,7 @@ def main():
             # Если нажат Enter, начинаем игру сначала.
             if enter_preseed:
                 game_over = False
+                reset_screen()
                 reset_game(snake, apple, stones, bad_food)
             # Если Enter не был нажат, выводим на экран надпись и результат.
             else:
@@ -605,6 +655,9 @@ def main():
                             stones,
                             bad_food,
                         ))
+                        # Рисуем только что появившуюся
+                        # плохую еду.
+                        bad_food.draw()
                     if snake.max_length % 7 == 0:
                         stones.add_position(get_occupied_positions(
                             snake,
@@ -612,6 +665,8 @@ def main():
                             stones,
                             bad_food,
                         ))
+                        # Рисуем только что появившийся камень.
+                        stones.draw()
                 # Новое яблоко теперь учитывает координаты новой головы змеи.
                 if ate_apple:
                     apple.randomize_position(get_occupied_positions(
@@ -619,6 +674,7 @@ def main():
                         stones,
                         bad_food,
                     ))
+                    apple.draw()
                 # Удаляем "неправильную еду", если она была съедена.
                 if ate_bad_food:
                     bad_food.remove_position(next_head_position)
@@ -627,11 +683,14 @@ def main():
                         snake.get_head_position() in stones.positions:
                     game_over = True
 
-            # Отрисовка яблока, змеи, камней и неправильной еды.
-            apple.draw()
-            stones.draw()
-            bad_food.draw()
-            snake.draw()
+            # Стираем старые сегменты и рисуем
+            # только новую голову.
+            snake.draw_move()
+            # # Отрисовка яблока, змеи, камней и неправильной еды.
+            # apple.draw()
+            # stones.draw()
+            # bad_food.draw()
+            # snake.draw_move()
 
         # Обновлене экрана
         pg.display.update()
